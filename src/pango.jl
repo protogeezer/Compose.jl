@@ -4,7 +4,7 @@
 import Fontconfig
 
 const libpangocairo = Cairo._jl_libpangocairo
-const libpango = Cairo._jl_libpango
+const libpango = Cairo._jl_libpangoft2
 
 # Cairo text backend
 const CAIRO_FONT_TYPE_TOY = 0

@@ -1,7 +1,7 @@
 using Compat
 
 # Cairo backend for compose
-import Cairo
+import Cairo, Fontconfig
 
 using Cairo: CairoContext, CairoSurface, CairoARGBSurface,
              CairoEPSSurface, CairoPDFSurface, CairoSVGSurface,
@@ -499,39 +499,15 @@ end
 
 function apply_property(img::Image, property::FontPrimitive)
     img.font = property.family
-
-    font_desc = ccall((:pango_layout_get_font_description, Cairo._jl_libpango),
-                      Ptr{Void}, (Ptr{Void},), img.ctx.layout)
-
-    if font_desc == C_NULL
-        size = absolute_native_units(img, default_font_size.value)
-    else
-        size = ccall((:pango_font_description_get_size, Cairo._jl_libpango),
-                     Cint, (Ptr{Void},), font_desc)
-    end
-
-    Cairo.set_font_face(img.ctx,
-        @sprintf("%s %0.2fpx", property.family, size / PANGO_SCALE))
+    pat = match(Fontconfig.Pattern(":postscriptname="*property.family),false);
+		Cairo.set_font_face(img.ctx,Fontconfig.Pattern(pat))
 end
 
 
 function apply_property(img::Image, property::FontSizePrimitive)
     img.fontsize = property.value
-
-    font_desc = ccall((:pango_layout_get_font_description, Cairo._jl_libpango),
-                      Ptr{Void}, (Ptr{Void},), img.ctx.layout)
-
-    if font_desc == C_NULL
-        family = "sans"
-    else
-        family = ccall((:pango_font_description_get_family, Cairo._jl_libpango),
-                       Ptr{UInt8}, (Ptr{Void},), font_desc)
-        family = unsafe_string(family)
-    end
-
-    Cairo.set_font_face(img.ctx,
-        @sprintf("%s %.2fpx",
-            family, absolute_native_units(img, property.value.value)))
+    # font size should be fractional points not mm
+    Cairo.set_font_size(img.ctx, property.value.value/pt.value)
 end
 
 
