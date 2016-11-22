@@ -1,7 +1,7 @@
 
 # Estimation of text extents using pango.
 
-import Fontconfig
+import Cairo, Fontconfig
 
 const libpangocairo = Cairo._jl_libpangocairo
 const libpango = Cairo._jl_libpangoft2
@@ -21,7 +21,7 @@ function pango_fmt_float(x::Float64)
     return @sprintf("%0.4f", x)
 end
 
-
+#=
 # Use the freetype/fontconfig backend to find the best match to a font
 # description.
 #
@@ -71,12 +71,12 @@ type PangoLayout
         new(layout)
     end
 end
+=#
 
 # Set the layout's font.
-function pango_set_font(pangolayout::PangoLayout, family::AbstractString, pts::Number)
-    fd = match_font(family, pts)
-    ccall((:pango_layout_set_font_description, libpango),
-          Void, (Ptr{Void}, Ptr{Void}), pangolayout.layout, fd)
+function pango_set_font(ctx::Cairo.CairoContext, pat::Fontconfig.Pattern, pts::Float64)
+    Cairo.set_font_face(ctx,pat);
+    Cairo.set_font_size(ctx,pts);
 end
 
 
@@ -89,16 +89,16 @@ end
 # Returns:
 #   A (width, height) tuple in absolute units.
 #
-function pango_text_extents(pangolayout::PangoLayout, text::AbstractString)
+function pango_text_extents(ctx::Cairo.CairoContext, text::AbstractString)
     textarray = convert(Vector{UInt8}, convert(Compat.UTF8String, text))
     ccall((:pango_layout_set_markup, libpango),
           Void, (Ptr{Void}, Ptr{UInt8}, Int32),
-          pangolayout.layout, textarray, length(textarray))
+          ctx.layout, textarray, length(textarray))
 
-    extents = Array(Int32, 4)
+    extents = Array(Int32, 4);
     ccall((:pango_layout_get_extents, libpango),
           Void, (Ptr{Void}, Ptr{Int32}, Ptr{Int32}),
-          pangolayout.layout, extents, C_NULL)
+          ctx.layout, C_NULL, extents)
 
     width, height = (extents[3] / PANGO_SCALE)pt, (extents[4] / PANGO_SCALE)pt
 end
@@ -116,38 +116,52 @@ end
 # Returns:
 #   A (width, height) tuple in absolute units.
 #
-function max_text_extents(font_family::AbstractString, pts::Float64, texts::AbstractString...)
-    pango_set_font(pangolayout::PangoLayout, font_family, pts)
+function max_text_extents(font::AbstractString, pts::Float64, texts::AbstractString...)
+		pat = match(Fontconfig.Pattern(":postscriptname="*font),false);
+    pango_set_font(cairo_ctx, pat, pts)
     max_width  = 0mm
     max_height = 0mm
     for text in texts
-        (width, height) = pango_text_extents(pangolayout::PangoLayout, text)
+        (width, height) = pango_text_extents(cairo_ctx, text)
         max_width  = max_width.value  < width.value  ? width  : max_width
         max_height = max_height.value < height.value ? height : max_height
     end
     return (max_width, max_height)
 end
 
+
 # Same as max_text_extents but with font_size in arbitrary absolute units.
-function max_text_extents(font_family::AbstractString, size::Measure,
+function max_text_extents(font::AbstractString, size::Measure,
                       texts::AbstractString...)
     if !isa(size, AbsoluteLength)
         error("text_extents requries font size be in absolute units")
     end
-    return max_text_extents(font_family, size/pt, texts...)
+    return max_text_extents(font, size/pt, texts...)
 end
 
 
 # Return an array with the extents of each element
-function text_extents(font_family::AbstractString, pts::Float64, texts::AbstractString...)
-    pango_set_font(pangolayout::PangoLayout, font_family, pts)
-    return [pango_text_extents(pangolayout::PangoLayout, text)
+function text_extents(font::AbstractString, pts::Float64, texts::AbstractString...)
+		pat = match(Fontconfig.Pattern(":postscriptname="*font),false);
+    pango_set_font(cairo_ctx, pat, pts)
+    return [pango_text_extents(cairo_ctx, text)
             for text in texts]
 end
 
 
-function text_extents(font_family::AbstractString, size::Measure, texts::AbstractString...)
-    return text_extents(font_family, size/pt, texts...)
+function text_extents(font::AbstractString, size::Measure, texts::AbstractString...)
+    return text_extents(font, size/pt, texts...)
+end
+
+function cairo_text_extents(font::AbstractString, size::Float64, text::AbstractString)
+		pat = match(Fontconfig.Pattern(":postscriptname="*font),false);
+		pango_set_font(cairo_ctx,pat,size);
+
+    extents = Array(Float64, 6,1);
+    ccall((:cairo_text_extents, Cairo._jl_libcairo),
+          Void, (Ptr{Void}, Ptr{UInt8}, Ptr{Float64}),
+          cairo_ctx.ptr, @compat(String(text)), extents)
+    return extents
 end
 
 

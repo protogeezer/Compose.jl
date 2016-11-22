@@ -15,6 +15,7 @@ abstract SVGBackend <: VectorImageBackend
 abstract PDFBackend <: VectorImageBackend
 abstract PSBackend  <: VectorImageBackend
 abstract CairoBackend <: VectorImageBackend
+abstract RecordingBackend <: VectorImageBackend
 
 type ImagePropertyState
     stroke::RGBA{Float64}

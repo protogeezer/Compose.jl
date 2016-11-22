@@ -17,7 +17,7 @@ import Measures: resolve, w, h
 
 export compose, compose!, Context, UnitBox, AbsoluteBoundingBox, Rotation, Mirror,
        ParentDrawContext, context, ctxpromise, table, set_units!, minwidth, minheight,
-       text_extents, max_text_extents, polygon, line, rectangle, circle, path,
+       text_extents, max_text_extents, cairo_text_extents, polygon, line, rectangle, circle, path,
        ellipse, text, curve, bitmap, stroke, fill, strokedash, strokelinecap,
        strokelinejoin, linewidth, visible, fillopacity, strokeopacity, clip,
        font, fontsize, svgid, svgclass, svgattribute, jsinclude, jscall, Measure,
@@ -171,9 +171,20 @@ macro missing_cairo_error(backend)
     string(msg1, msg2)
 end
 
-if isinstalled("Cairo")
+# If available, Cairo/Pango and Fontconfig are used to compute text extents and match
+# fonts. Otherwise a simplistic pure-julia fallback is used.
+if isinstalled("Cairo") && isinstalled("Fontconfig")
     include("cairo_backends.jl")
     include("immerse_backend.jl")
+    
+    pango_cairo_ctx = C_NULL
+    include("pango.jl")
+
+    function __init__()
+    		devnull = open("/dev/null","w")
+    		global cairo_pdf_surface = Cairo.CairoPDFSurface(devnull, 8.5*72.0, 11*72.0);
+    		global cairo_ctx = Cairo.creategc(cairo_pdf_surface);
+    end
 else
     global PNG
     global PS
@@ -182,30 +193,15 @@ else
     PNG(args...) = error(@missing_cairo_error "PNG")
     PS(args...) = error(@missing_cairo_error "PS")
     PDF(args...) = error(@missing_cairo_error "PDF")
+    
+    println("Warning: required packages Cairo and/or Fontconfig are not installed.")
+    println("Warning: most font parameters will be ignored.")
+    println("Warning: PDF, PS, and PNG file creation is disabled.")
+    
+    include("fontfallback.jl")
 end
 include("svg.jl")
 include("pgf_backend.jl")
-
-# If available, pango and fontconfig are used to compute text extents and match
-# fonts. Otherwise a simplistic pure-julia fallback is used.
-
-if isinstalled("Fontconfig")
-    pango_cairo_ctx = C_NULL
-    include("pango.jl")
-
-    function __init__()
-        global pango_cairo_ctx
-        global pangolayout
-        ccall((:g_type_init, Cairo._jl_libgobject), Void, ())
-        pango_cairo_fm  = ccall((:pango_cairo_font_map_new, libpangocairo),
-                                 Ptr{Void}, ())
-        pango_cairo_ctx = ccall((:pango_font_map_create_context, libpango),
-                                 Ptr{Void}, (Ptr{Void},), pango_cairo_fm)
-        pangolayout = PangoLayout()
-    end
-else
-    include("fontfallback.jl")
-end
 
 @compat function show(io::IO, m::MIME"text/html", ctx::Context)
     draw(SVGJS(io, default_graphic_width, default_graphic_height, false,
@@ -216,11 +212,11 @@ end
     draw(SVG(io, default_graphic_width, default_graphic_height, false), ctx)
 end
 
-try
+	try
     getfield(Compose, :Cairo) # throws if Cairo isn't being used
     @compat function show(io::IO, ::MIME"image/png", ctx::Context)
         draw(PNG(io, default_graphic_width, default_graphic_height), ctx)
-    end
+  end
 end
 
 
