@@ -5,7 +5,7 @@ import Cairo, Fontconfig
 
 using Cairo: CairoContext, CairoSurface, CairoARGBSurface,
              CairoEPSSurface, CairoPDFSurface, CairoSVGSurface,
-             CairoImageSurface
+             CairoImageSurface, CairoRecordingSurface
 
 abstract ImageBackend
 abstract PNGBackend <: ImageBackend
@@ -15,7 +15,7 @@ abstract SVGBackend <: VectorImageBackend
 abstract PDFBackend <: VectorImageBackend
 abstract PSBackend  <: VectorImageBackend
 abstract CairoBackend <: VectorImageBackend
-abstract RecordingBackend <: VectorImageBackend
+abstract CairoRecordingBackend <: VectorImageBackend
 
 type ImagePropertyState
     stroke::RGBA{Float64}
@@ -183,7 +183,7 @@ typealias PNG Image{PNGBackend}
 typealias PDF Image{PDFBackend}
 typealias PS  Image{PSBackend}
 typealias CAIROSURFACE  Image{CairoBackend}
-
+typealias RecordingSurface Image{CairoRecordingBackend}
 
 function canbatch(img::Image)
     for vp in values(img.vector_properties)
@@ -268,6 +268,8 @@ function newsurface{B}(::Type{B}, out, width, height)
             surface = CairoPDFSurface(out, width, height)
         elseif B == PSBackend
             surface = CairoEPSSurface(out, width, height)
+        elseif B == CairoRecordingBackend
+        		surface = CairoRecordingSurface(width, height)
         elseif B == CairoBackend
             surface = out
         else

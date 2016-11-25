@@ -21,13 +21,15 @@ export compose, compose!, Context, UnitBox, AbsoluteBoundingBox, Rotation, Mirro
        ellipse, text, curve, bitmap, stroke, fill, strokedash, strokelinecap,
        strokelinejoin, linewidth, visible, fillopacity, strokeopacity, clip,
        font, fontsize, svgid, svgclass, svgattribute, jsinclude, jscall, Measure,
-       inch, mm, cm, pt, px, cx, cy, w, h, hleft, hcenter, hright, vtop, vcenter,
-       vbottom, SVG, SVGJS, PGF, PNG, PS, PDF, draw, pad, pad_inner, pad_outer,
+       inch, mm, cm, pt, px, cx, cy, w, h, 
+       hleft, hcenter, hright, vtop, vcenter,vbottom, 
+       SVG, SVGJS, PGF, PNG, PS, PDF, RecordingSurface, 
+       draw, drawpart, pad, pad_inner, pad_outer,
        hstack, vstack, gridstack, LineCapButt, LineCapSquare, LineCapRound,
        CAIROSURFACE, introspect, set_default_graphic_size, set_default_jsmode,
        boundingbox, Patchable
 
-
+typealias ColorOrNothing @compat(Union{Colorant, (@compat Void)})
 
 function isinstalled(pkg, ge=v"0.0.0-")
     try
