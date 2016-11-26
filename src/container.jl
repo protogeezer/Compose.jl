@@ -431,26 +431,27 @@ function draw(backend::Backend, root_container::Container, padding::Measure, bac
 		error("The backend has already been drawn upon.")
 	end
 	
-	# points
-  width = backend.width*pt;
-	height = backend.height*pt;
+	if typeof(backend) == Compose.Image{Compose.PDFBackend}
+		# points
+		width = backend.width*pt;
+		height = backend.height*pt;
 		
-	# see what the shape of the plot is with the pad...
-	img = RecordingSurface(width, height, false, dpi=72)
-	drawpart(img, root_container, IdentityTransform(), UnitBox(), root_box(img))
-	extents = Cairo.recording_surface_ink_extents(img.surface)
-	finish(img)
+		# see what the shape of the plot is with the pad...
+		img = RecordingSurface(width, height, false, dpi=72)
+		drawpart(img, root_container, IdentityTransform(), UnitBox(), root_box(img))
+		extents = Cairo.recording_surface_ink_extents(img.surface)
+		finish(img)
 		
-	# adjust the aspect ratio of the backend image to match the 
-	# desired shape (ie width = boundingbox.width + 2*padding...)
-	actual_width = (extents[1]inch+extents[3]inch)/96pt;
-	actual_width = actual_width*pt + 2*padding;
-	actual_height = (extents[2]inch+extents[4]inch)/96pt;
-	actual_height = actual_height*pt + 2*padding;
+		# adjust the aspect ratio of the backend image to match the 
+		# desired shape (ie width = boundingbox.width + 2*padding...)
+		actual_width = (extents[1]inch+extents[3]inch)/96pt;
+		actual_width = actual_width*pt + 2*padding;
+		actual_height = (extents[2]inch+extents[4]inch)/96pt;
+		actual_height = actual_height*pt + 2*padding;
 		
-	ccall((:cairo_pdf_surface_set_size,Cairo._jl_libcairo), Void, (Ptr{Void}, Float64, Float64),
-		 backend.surface.ptr, ceil(actual_width/pt), ceil(actual_height/pt));
-
+		ccall((:cairo_pdf_surface_set_size,Cairo._jl_libcairo), Void, (Ptr{Void}, Float64, Float64),
+			 backend.surface.ptr, ceil(actual_width/pt), ceil(actual_height/pt));
+	end
 	if background != nothing
 			compose!(root_container, (context(order=-1000000),
 											fill(background),
