@@ -433,14 +433,14 @@ function draw(backend::Backend, root_container::Container, padding::Measure, bac
 	
 	if typeof(backend) == Compose.Image{Compose.PDFBackend}
 		# points
-		width = backend.width*pt;
-		height = backend.height*pt;
+		width = backend.width*pt*96.0/72.0;
+		height = backend.height*pt*96.0/72.0;
 		
 		# see what the shape of the plot is with the pad...
 		img = RecordingSurface(width, height, false, dpi=72)
+		
 		drawpart(img, root_container, IdentityTransform(), UnitBox(), root_box(img))
 		extents = Cairo.recording_surface_ink_extents(img.surface)
-		finish(img)
 		
 		# adjust the aspect ratio of the backend image to match the 
 		# desired shape (ie width = boundingbox.width + 2*padding...)
@@ -451,7 +451,17 @@ function draw(backend::Backend, root_container::Container, padding::Measure, bac
 		
 		ccall((:cairo_pdf_surface_set_size,Cairo._jl_libcairo), Void, (Ptr{Void}, Float64, Float64),
 			 backend.surface.ptr, ceil(actual_width/pt), ceil(actual_height/pt));
+		ccall((:cairo_scale,Cairo._jl_libcairo),Void,(Ptr{Void},Float64,Float64),
+			backend.ctx.ptr,72.0/96.0,72.0/96.0)	 
+		ccall((:cairo_set_source_surface,Cairo._jl_libcairo),Void,(Ptr{Void},Ptr{Void},Float64,Float64),
+			backend.ctx.ptr, img.surface.ptr, 0.0, 0.0)
+			
+		ccall((:cairo_paint,Cairo._jl_libcairo),Void,(Ptr{Void},),backend.ctx.ptr)
+		finish(img);
+		finish(backend);
+		return nothing
 	end
+	
 	if background != nothing
 			compose!(root_container, (context(order=-1000000),
 											fill(background),
