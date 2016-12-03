@@ -431,45 +431,52 @@ function draw(backend::Backend, root_container::Container, padding::Measure, bac
 		error("The backend has already been drawn upon.")
 	end
 	
-	if typeof(backend) == Compose.Image{Compose.PDFBackend}
-		# points
-		width = backend.width*pt*96.0/72.0;
-		height = backend.height*pt*96.0/72.0;
-		
+	if typeof(backend) == Compose.Image{Compose.PDFBackend}		
 		# see what the shape of the plot is with the pad...
-		img = RecordingSurface(width, height, false, dpi=72)
+		img = RecordingSurface(width(backend), height(backend), false, dpi=72)
 		
 		drawpart(img, root_container, IdentityTransform(), UnitBox(), root_box(img))
-		extents = Cairo.recording_surface_ink_extents(img.surface)
 		
+		extents = Cairo.recording_surface_ink_extents(img.surface)
+				
 		# adjust the aspect ratio of the backend image to match the 
 		# desired shape (ie width = boundingbox.width + 2*padding...)
-		actual_width = (extents[1]inch+extents[3]inch)/96pt;
-		actual_width = actual_width*pt + 2*padding;
-		actual_height = (extents[2]inch+extents[4]inch)/96pt;
-		actual_height = actual_height*pt + 2*padding;
+		pad_pts = ceil((padding*pt).value)
+		w_pts = extents[3] + 2*pad_pts;
+		h_pts = extents[4] + 2*pad_pts;
+		x_off = pad_pts - extents[1];
+		y_off = pad_pts - extents[2];
 		
+		# set surface size
+		backend.width = w_pts;
+		backend.height = h_pts;
 		ccall((:cairo_pdf_surface_set_size,Cairo._jl_libcairo), Void, (Ptr{Void}, Float64, Float64),
-			 backend.surface.ptr, ceil(actual_width/pt), ceil(actual_height/pt));
-		ccall((:cairo_scale,Cairo._jl_libcairo),Void,(Ptr{Void},Float64,Float64),
-			backend.ctx.ptr,72.0/96.0,72.0/96.0)	 
-		ccall((:cairo_set_source_surface,Cairo._jl_libcairo),Void,(Ptr{Void},Ptr{Void},Float64,Float64),
-			backend.ctx.ptr, img.surface.ptr, 0.0, 0.0)
-			
-		ccall((:cairo_paint,Cairo._jl_libcairo),Void,(Ptr{Void},),backend.ctx.ptr)
-		finish(img);
-		finish(backend);
-		return nothing
-	end
+				backend.surface.ptr, w_pts, h_pts);
+
+		if background != nothing
+			rgb = convert(ARGB,background);
+			Cairo.save(backend.ctx)
+			Cairo.set_source_rgba(backend.ctx,rgb.r,rgb.g,rgb.b,rgb.alpha);
+			Cairo.rectangle(backend.ctx,0.0,0.0,w_pts,w_pts);
+			Cairo.fill(backend.ctx)
+			Cairo.restore(backend.ctx)
+		end
 	
-	if background != nothing
+     ccall((:cairo_set_source_surface,Cairo._jl_libcairo),Void,(Ptr{Void},Ptr{Void},Float64,Float64),
+                       backend.ctx.ptr, img.surface.ptr, x_off, y_off)   
+     ccall((:cairo_paint,Cairo._jl_libcairo),Void,(Ptr{Void},),backend.ctx.ptr)
+		finish(backend)
+		finish(img)
+	else
+		if background != nothing
 			compose!(root_container, (context(order=-1000000),
 											fill(background),
 											stroke(nothing), rectangle()))
-	end
+		end
 	
-	drawpart(backend, root_container, IdentityTransform(), UnitBox(), root_box(backend))
-	finish(backend)
+		drawpart(backend, root_container, IdentityTransform(), UnitBox(), root_box(backend))
+		finish(backend)
+	end
 end
 
 register_coords(backend::Backend, box, units, transform, form) = nothing
